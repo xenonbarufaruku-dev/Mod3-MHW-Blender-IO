@@ -22,7 +22,7 @@ try:
 except:
     import sys
     sys.path.insert(0, r'..\mod3')
-    from ModellingApi import ModellingAPI, debugger
+    from ..mod3.ModellingApi import ModellingAPI, debugger
     
 def processPath(path):
     return os.path.splitext(os.path.basename(path))[0]
@@ -96,12 +96,12 @@ class BlenderImporterAPI(ModellingAPI):
         bpy.ops.object.select_all(action='DESELECT')
         blenderArmature = bpy.data.armatures.new('%s Armature'%filename)
         arm_ob = bpy.data.objects.new('%s Armature'%filename, blenderArmature)
-        bpy.context.scene.objects.link(arm_ob)
-        bpy.context.scene.update()
-        arm_ob.select = True
-        arm_ob.show_x_ray = True
-        bpy.context.scene.objects.active = arm_ob
-        blenderArmature.draw_type = 'STICK'
+        bpy.context.collection.objects.link(arm_ob)
+        bpy.context.view_layer.update()
+        arm_ob.select_set(True)
+        arm_ob.show_in_front = True
+        bpy.context.view_layer.objects.active = arm_ob
+        blenderArmature.display_type = 'STICK'
         bpy.ops.object.mode_set(mode='EDIT')
         
         empty = BlenderImporterAPI.createParentBone(blenderArmature)
@@ -165,7 +165,7 @@ class BlenderImporterAPI(ModellingAPI):
     @staticmethod
     def clearSelection():
         for ob in bpy.context.selected_objects:
-            ob.select = False
+            ob.select_set(False)
      
     @staticmethod
     def linkEmptyTree(context):
@@ -180,13 +180,13 @@ class BlenderImporterAPI(ModellingAPI):
                 if not modifier.vertex_group:
                     ob.modifiers.remove(modifier)
                 else:
-                    bpy.context.scene.objects.active = ob
-                    ob.select = True
+                    bpy.context.view_layer.objects.active = ob
+                    ob.select_set(True)
                     bpy.ops.object.mode_set(mode = 'EDIT')
                     bpy.ops.object.hook_reset(modifier = armature[bone].name)
                     bpy.ops.object.mode_set(mode = 'OBJECT')
-                    ob.select = False
-                    bpy.context.scene.objects.active = None
+                    ob.select_set(False)
+                    bpy.context.view_layer.objects.active = None
 
     @staticmethod
     def linkArmature(context):
@@ -348,7 +348,7 @@ class BlenderImporterAPI(ModellingAPI):
         blenderMesh.update()
         blenderObject = bpy.data.objects.new("%s LOD %d"%(name,meshpart["properties"]["lod"]), blenderMesh)
         BlenderImporterAPI.dbg.write("\t\t\tGeometry Link\n")
-        bpy.context.scene.objects.link(blenderObject)
+        bpy.context.collection.objects.link(blenderObject)
         return blenderMesh, blenderObject
     
     @staticmethod
@@ -364,7 +364,7 @@ class BlenderImporterAPI(ModellingAPI):
         meshpart.normals_split_custom_set_from_vertices([normalize(v) for v in normals])
         #meshpart.normals_split_custom_set([normals[loop.vertex_index] for loop in meshpart.loops])
         meshpart.use_auto_smooth = True
-        meshpart.show_edge_sharp = True
+        #meshpart.show_edge_sharp = True
         
         #db
     
@@ -399,9 +399,9 @@ class BlenderImporterAPI(ModellingAPI):
     def createRootNub(miniscene):
         o = bpy.data.objects.new("Root", None )
         miniscene[255]=o
-        bpy.context.scene.objects.link( o )
+        bpy.context.collection.objects.link( o )
         o.show_wire = True
-        o.show_x_ray = True
+        o.show_in_front = True
         return
         
     
@@ -415,7 +415,7 @@ class BlenderImporterAPI(ModellingAPI):
         name = "BoneFunction.%03d" % bone["CustomProperties"]["boneFunction"]
         o = bpy.data.objects.new(name, None )#ix
         miniscene[ix]=o
-        bpy.context.scene.objects.link( o )
+        bpy.context.collection.objects.link( o )
         #if bone["parentId"]!=255:
         parentName = bone["parentId"]
         if parentName not in miniscene:
@@ -424,7 +424,7 @@ class BlenderImporterAPI(ModellingAPI):
         
         o.matrix_local = BlenderImporterAPI.deserializeMatrix("LMatCol",bone)
         o.show_wire = True
-        o.show_x_ray = True
+        o.show_in_front = True
         o.show_bounds = True
         BlenderImporterAPI.parseProperties(bone["CustomProperties"],o.__setitem__)
         o["indexHint"] = ix# if preserveOrdering else -1
@@ -500,7 +500,7 @@ class BlenderImporterAPI(ModellingAPI):
                 groupName = "BoneFunction.%s"%groupId
                 for vertex,weight in group:
                     if groupName not in blenderObject.vertex_groups:
-                        blenderObject.vertex_groups.new(groupName)#blenderObject Maybe?
+                        blenderObject.vertex_groups.new(name=groupName)#blenderObject Maybe?
                     blenderObject.vertex_groups[groupName].add([vertex], weight, 'ADD')
         return
     
@@ -537,7 +537,7 @@ class BlenderImporterAPI(ModellingAPI):
         #if bpy.context.active_object.mode!='OBJECT':
         #    bpy.ops.object.mode_set(mode='OBJECT')
         BlenderImporterAPI.dbg.write("\t\tCreating new UV\n")
-        blenderMesh.uv_textures.new(name)
+        blenderMesh.uv_layers.new(name = name)
         blenderMesh.update()
         BlenderImporterAPI.dbg.write("\t\tCreating BMesh\n")
         blenderBMesh = bmesh.new()
@@ -557,7 +557,7 @@ class BlenderImporterAPI(ModellingAPI):
         BlenderImporterAPI.dbg.write("\t\tMesh Written Back\n")
         blenderMesh.update()
         BlenderImporterAPI.dbg.write("\t\tMesh Updated\n")
-        return blenderMesh.uv_textures[name]
+        return blenderMesh.uv_layers[name]
     
     @staticmethod
     def uvFaceCombination(vertexUVMap, FaceList):
@@ -578,8 +578,8 @@ class BlenderImporterAPI(ModellingAPI):
         constraint = lattice_ob.constraints.new("CHILD_OF")
         constraint.target = armature[box.bone()] if box.bone() in armature else None
         lattice["Type"] = "MOD3_BoundingBox_AABB"
-        bpy.context.scene.objects.link(lattice_ob)
-        bpy.context.scene.update()
+        bpy.context.collection.objects.link(lattice_ob)
+        bpy.context.view_layer.update()
         return lattice_ob
     
     @staticmethod
@@ -597,8 +597,8 @@ class BlenderImporterAPI(ModellingAPI):
             lattice_ob["bone_index"] = box.bone()
         constraint.target = armature[box.bone()] if box.bone() in armature else None
         lattice["Type"] = "MOD3_BoundingBox_MVBB"
-        bpy.context.scene.objects.link(lattice_ob)
-        bpy.context.scene.update()
+        bpy.context.collection.objects.link(lattice_ob)
+        bpy.context.view_layer.update()
         return lattice_ob
 
     @staticmethod

@@ -8,12 +8,14 @@ import bpy
 from bpy_extras.io_utils import ImportHelper
 from bpy.props import StringProperty, BoolProperty, EnumProperty
 from bpy.types import Operator
+from bpy.types import Panel
+from bpy_extras.io_utils import ImportHelper, ExportHelper
+import addon_utils
 
 from ..mod3 import Mod3ImporterLayer as Mod3IL
 from ..blender import BlenderMod3Importer as Api
 from ..blender import BlenderSupressor
 from ..common import FileLike as FL
-
 
 class Context():
     def __init__(self, path, meshes, armature):
@@ -22,65 +24,106 @@ class Context():
         self.armature = armature
         self.setDefaults = False
 
-class ImportMOD3(Operator, ImportHelper):
+class PANEL_IMPORT_PT_MHW_Mod3Settings(Panel):
+    bl_space_type = 'FILE_BROWSER'
+    bl_region_type = 'TOOL_PROPS'
+    bl_label = "Import Settings"
+
+    @classmethod
+    def poll(cls, context):
+        sfile = context.space_data
+        operator = sfile.active_operator
+        return operator.bl_idname == "CUSTOM_IMPORT_OT_import_mhw_mod3"
+    
+    def draw(self, context):
+        layout = self.layout
+        sfile = context.space_data
+        operator = sfile.active_operator
+        
+        layout.prop(operator, 'clear_scene')
+        layout.prop(operator, 'maximize_clipping')
+        layout.prop(operator, 'high_lod')
+        layout.prop(operator, 'import_header')
+        layout.prop(operator, 'import_meshparts')
+        layout.prop(operator, 'import_textures')
+        layout.prop(operator, 'import_materials')
+        layout.prop(operator, 'omit_empty')
+        layout.prop(operator, 'load_group_functions')
+        layout.prop(operator, 'texture_path')
+        layout.prop(operator, 'import_skeleton')
+        layout.prop(operator, 'weight_format')
+
+class ImportMOD3(bpy.types.Operator, ImportHelper):
     bl_idname = "custom_import.import_mhw_mod3"
     bl_label = "Load MHW MOD3 file (.mod3)"
     bl_options = {'REGISTER', 'PRESET', 'UNDO'}
 
     # ImportHelper mixin class uses this
     filename_ext = ".mod3"
-    filter_glob = StringProperty(default="*.mod3", options={'HIDDEN'}, maxlen=255)
 
-    clear_scene = BoolProperty(
-        name = "Clear scene before import.",
-        description = "Clears all contents before importing",
-        default = True)
-    maximize_clipping = BoolProperty(
+    files: bpy.props.CollectionProperty(type=bpy.types.PropertyGroup)
+    filter_glob: bpy.props.StringProperty(default="*.mod3")
+
+    clear_scene: bpy.props.BoolProperty(
+        name = "Clear scene before import.", 
+        description = "Clears all contents before importing", 
+        default = True
+        )
+    maximize_clipping: BoolProperty(
         name = "Maximizes clipping distance.",
         description = "Maximizes clipping distance to be able to see all of the model at once.",
-        default = True)
-    high_lod = BoolProperty(
+        default = True
+        )
+    high_lod: BoolProperty(
         name = "Only import high LOD parts.",
         description = "Skip meshparts with low level of detail.",
-        default = True)
-    import_header = BoolProperty(
+        default = True
+        )
+    import_header: BoolProperty(
         name = "Import File Header.",
         description = "Imports file headers as scene properties.",
-        default = True)
-    import_meshparts = BoolProperty(
+        default = True
+        )
+    import_meshparts: BoolProperty(
         name = "Import Meshparts.",
         description = "Imports mesh parts as meshes.",
-        default = True)
-    import_textures = BoolProperty(
+        default = True
+        )
+    import_textures: BoolProperty(
         name = "Import Textures.",
         description = "Imports texture as specified by mrl3.",
-        default = True)
-    import_materials = BoolProperty(
+        default = True
+        )
+    import_materials: BoolProperty(
         name = "Import Materials.",
         description = "Imports maps as materials as specified by mrl3.",
-        default = False)
-    omit_empty = BoolProperty(
+        default = False
+        )
+    omit_empty: BoolProperty(
         name = "Omit Unused Weights.",
         description = "Omit weights not in any Bounding Box.",
-        default = False)
-    load_group_functions = BoolProperty(
+        default = False
+        )
+    load_group_functions: BoolProperty(
         name = "Load Bounding Boxes.",
         description = "Loads the mod3 as bounding boxes.",
         default = False,
         )
-    texture_path = StringProperty(
+    texture_path: StringProperty(
         name = "Texture Source",
         description = "Root directory for the MRL3 (Native PC if importing from a chunk).",
-        default = "")
-    import_skeleton = EnumProperty(
+        default = ""
+        )
+    import_skeleton: EnumProperty(
         name = "Import Skeleton.",
         description = "Imports the skeleton as an armature.",
         items = [("None","Don't Import","Does not import the skeleton.",0),
                   ("EmptyTree","Empty Tree","Import the skeleton as a tree of empties",1),
                   ("Armature","Animation Armature","Import the skeleton as a blender armature",2),
                   ],
-        default = "EmptyTree")
-    weight_format = EnumProperty(
+        default = "EmptyTree"
+        )
+    weight_format: EnumProperty(
         name = "Weight Format",
         description = "Preserves capcom scheme of having repeated weights and negative weights by having multiple weight groups for each bone.",
         items = [("Group","Standard","Weights under the same bone are grouped, negative weights are dropped",0),
@@ -88,7 +131,11 @@ class ImportMOD3(Operator, ImportHelper):
                   ("Split","Split Weight Notation","Mirrors the Mod3 separation of the same weight",2),
                   ("Slash","Split-Slash Notation","As split weight but also conserves weight order",3),
                   ],
-        default = "Group")
+        default = "Group"
+        )
+    
+    def draw(self, context):
+        pass
 
     def execute(self,context):
         try:
@@ -135,4 +182,4 @@ class ImportMOD3(Operator, ImportHelper):
         return options
 
 def menu_func_import(self, context):
-    self.layout.operator(ImportMOD3.bl_idname, text="MHW MOD3 (.mod3)")
+    self.layout.operator(ImportMOD3.bl_idname, text="MHW MOD3 (.mod3)", icon="OBJECT_DATA")

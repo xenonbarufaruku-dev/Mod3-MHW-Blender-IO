@@ -29,14 +29,14 @@ except:
     sys.path.insert(0, r'..\common')
     sys.path.insert(0, r'..\blender')
     sys.path.insert(0, r'..\boundingbox')
-    from Mod3DelayedResolutionWeights import BufferedWeight, BufferedWeights
-    from Mod3VertexBuffer import Mod3Vertex
-    from ModellingApi import ModellingAPI, debugger
-    from Mod3Mesh import Mod3BoundingBox
-    from Mod3Components import Mod3GroupProperty,Mod3HeaderFloatSegment,Mod3HeaderByteSegment   
+    from ..mod3.Mod3DelayedResolutionWeights import BufferedWeight, BufferedWeights
+    from ..mod3.Mod3VertexBuffers import Mod3Vertex
+    from ..mod3.ModellingApi import ModellingAPI, debugger
+    from ..mod3.Mod3Mesh import Mod3BoundingBox
+    from ..mod3.Mod3Components import Mod3GroupProperty,Mod3HeaderFloatSegment,Mod3HeaderByteSegment   
     from BlenderSupressor import SupressBlenderOps
-    from boundingBoxCalculations import estimateBoundingBox
-    from crc import CrcJamcrc
+    from ..boundingbox.boundingBoxCalculations import estimateBoundingBox
+    from ..common.crc import CrcJamcrc
     
 generalhash =  lambda x:  CrcJamcrc.calc(x.encode())
     
@@ -108,7 +108,7 @@ class BlenderExporterAPI(ModellingAPI):
     def showMessageBox(message = "", title = "Message Box", icon = 'INFO'):
     
         def draw(self, context):
-            self.layout.label(message)
+            self.layout.label(text = message)
     
         bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
     
@@ -244,7 +244,7 @@ class BlenderExporterAPI(ModellingAPI):
                 if name in groupToBone:
                     skeletonElement = skeletonMap[groupToBone[name]]
                     boneCoordinates = skeletonMap.getBoneByName(groupToBone[name]).matrix_world.inverted()
-                    groups[skeletonElement].append((boneCoordinates*vertex.co).freeze())
+                    groups[skeletonElement].append((boneCoordinates@vertex.co).freeze())
         return {k:list(set(i)) for k,i in groups.items() if len(i)>0}
     
     @staticmethod
@@ -359,7 +359,7 @@ class BlenderExporterAPI(ModellingAPI):
             return 0
         if "Type" in rootCandidate:
             if rootCandidate["Type"] == "MOD3_SkeletonRoot":
-                if rootCandidate.hide:
+                if rootCandidate.hide_get():
                     return 3
                 return 4
             else:
@@ -498,7 +498,7 @@ class BlenderExporterAPI(ModellingAPI):
             vTangent = list(map(round, loop.tangent*127)) + [int(loop.bitangent_sign)*127]
             if loop.vertex_index in normals and \
                 any([not (-1<=(c0-c1)<=1) for c0,c1 in zip(normals[loop.vertex_index],vNormal) ]):
-                bpy.context.scene.cursor_location = mesh.vertices[loop.vertex_index].co
+                bpy.context.scene.cursor.location = mesh.vertices[loop.vertex_index].co
                 errorHandler.duplicateNormal(loop.vertex_index, vNormal, vTangent, normals)
             else:
                 normals[loop.vertex_index] = vNormal
